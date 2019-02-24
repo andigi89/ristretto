@@ -874,7 +874,6 @@ configure_monitor_chooser_pixbuf (
 {
     cairo_surface_t *image_surface = NULL;
     cairo_t *ctx;
-    //GdkColor bg_color;
 
     GdkPixbuf *tmp_pixbuf = NULL;
 
@@ -921,7 +920,6 @@ configure_monitor_chooser_pixbuf (
                     surface_height);
             ctx = cairo_create ( image_surface );
 
-            //gdk_cairo_set_source_color ( ctx, bg_color );
             cairo_set_source_rgb (ctx, 0, 0, 0);
             cairo_paint (ctx);
 
