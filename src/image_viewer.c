@@ -173,13 +173,15 @@ static void
 rstto_image_viewer_destroy(GtkWidget *widget);
 
 static void
-rstto_image_viewer_size_request(GtkWidget *, GtkRequisition *);
+rstto_image_viewer_get_preferred_width(GtkWidget *, gint *, gint *);
+static void
+rstto_image_viewer_get_preferred_height(GtkWidget *, gint *, gint *);
 static void
 rstto_image_viewer_size_allocate(GtkWidget *, GtkAllocation *);
 static void
 rstto_image_viewer_realize(GtkWidget *);
 static gboolean 
-rstto_image_viewer_expose(GtkWidget *, GdkEventExpose *);
+rstto_image_viewer_draw(GtkWidget *, cairo_t *);
 static void
 rstto_image_viewer_paint (GtkWidget *widget, cairo_t *);
 
@@ -401,9 +403,10 @@ rstto_image_viewer_class_init(RsttoImageViewerClass *viewer_class)
 
     viewer_class->set_scroll_adjustments = rstto_image_viewer_set_scroll_adjustments;
 
-    widget_class->expose_event = rstto_image_viewer_expose;
+    widget_class->draw = rstto_image_viewer_draw;
     widget_class->realize = rstto_image_viewer_realize;
-    widget_class->size_request = rstto_image_viewer_size_request;
+    widget_class->get_preferred_width = rstto_image_viewer_get_preferred_width;
+    widget_class->get_preferred_height = rstto_image_viewer_get_preferred_height;
     widget_class->size_allocate = rstto_image_viewer_size_allocate;
     widget_class->scroll_event = rstto_scroll_event;
 
@@ -555,19 +558,21 @@ rstto_image_viewer_realize(GtkWidget *widget)
 }
 
 /**
- * rstto_image_viewer_size_request:
- * @widget:
- * @requisition:
+ * rstto_image_viewer_get_preferred_width/height:
  *
  * Request a default size of 300 by 400 pixels
  */
 static void
-rstto_image_viewer_size_request(GtkWidget *widget, GtkRequisition *requisition)
+rstto_image_viewer_get_preferred_width(GtkWidget *widget, gint *minimal_width, gint *natural_width)
 {
-    requisition->width = 400;
-    requisition->height= 300;
+    *minimal_width = *natural_width = 400;
 }
 
+static void
+rstto_image_viewer_get_preferred_height(GtkWidget *widget, gint *minimal_height, gint *natural_height)
+{
+    *minimal_height = *natural_height = 300;
+}
 
 /**
  * rstto_image_viewer_size_allocate:
@@ -612,22 +617,18 @@ rstto_image_viewer_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
  *
  */
 static gboolean
-rstto_image_viewer_expose(GtkWidget *widget, GdkEventExpose *event)
+rstto_image_viewer_draw(GtkWidget *widget, cairo_t *ctx)
 {
     RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER (widget);
-
-    cairo_t *ctx;
-
-    /* get a cairo_t */
-    ctx = gdk_cairo_create (gtk_widget_get_window (widget));
 
     /* set a clip region for the expose event */
     if (FALSE == viewer->priv->auto_scale)
     {
         cairo_rectangle (
                 ctx,
-                event->area.x, event->area.y,
-                event->area.width, event->area.height);
+                0, 0,
+                gtk_widget_get_allocated_width (widget),
+                gtk_widget_get_allocated_height (widget));
         cairo_clip (ctx);
     }
 
@@ -636,9 +637,6 @@ rstto_image_viewer_expose(GtkWidget *widget, GdkEventExpose *event)
     rstto_image_viewer_paint (widget, ctx);
 
     cairo_restore (ctx);
-
-    cairo_destroy (ctx);
-
 
     return TRUE;
 }
