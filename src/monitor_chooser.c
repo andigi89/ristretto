@@ -68,7 +68,7 @@ rstto_monitor_chooser_get_preferred_height(GtkWidget *, gint *, gint *);
 static void
 rstto_monitor_chooser_size_allocate(GtkWidget *, GtkAllocation *);
 static gboolean 
-rstto_monitor_chooser_expose(GtkWidget *, GdkEventExpose *);
+rstto_monitor_chooser_draw(GtkWidget *, cairo_t *);
 static gboolean
 rstto_monitor_chooser_paint(GtkWidget *widget);
 
@@ -148,7 +148,7 @@ rstto_monitor_chooser_class_init(RsttoMonitorChooserClass *chooser_class)
 
     parent_class = g_type_class_peek_parent(chooser_class);
 
-    widget_class->expose_event = rstto_monitor_chooser_expose;
+    widget_class->draw = rstto_monitor_chooser_draw;
     widget_class->realize = rstto_monitor_chooser_realize;
     widget_class->get_preferred_width = rstto_monitor_chooser_get_preferred_width;
     widget_class->get_preferred_height = rstto_monitor_chooser_get_preferred_height;
@@ -237,17 +237,17 @@ rstto_monitor_chooser_size_allocate(GtkWidget *widget, GtkAllocation *allocation
 }
 
 static gboolean
-rstto_monitor_chooser_expose(GtkWidget *widget, GdkEventExpose *event)
+rstto_monitor_chooser_paint(GtkWidget *widget)
 {
-    rstto_monitor_chooser_paint (widget);
-    return FALSE;
+    cairo_t *ctx = gdk_cairo_create (gtk_widget_get_window (widget));
+    rstto_monitor_chooser_draw(widget, ctx);
+    cairo_destroy (ctx);
 }
 
 static gboolean
-rstto_monitor_chooser_paint(GtkWidget *widget)
+rstto_monitor_chooser_draw(GtkWidget *widget, cairo_t *ctx)
 {
     RsttoMonitorChooser *chooser = RSTTO_MONITOR_CHOOSER (widget);
-    cairo_t *ctx = gdk_cairo_create (gtk_widget_get_window (widget));
     Monitor *monitor;
     GtkAllocation allocation;
 
@@ -391,8 +391,6 @@ rstto_monitor_chooser_paint(GtkWidget *widget)
             cairo_restore (ctx);
         }
     }
-
-    cairo_destroy (ctx);
 
     return FALSE;
 }
