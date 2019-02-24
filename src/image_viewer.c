@@ -52,7 +52,13 @@
 enum
 {
     PROP_0,
-    PROP_SHOW_CLOCK
+    PROP_SHOW_CLOCK,
+
+     /* For scrollable interface */
+    PROP_HADJUSTMENT,
+    PROP_VADJUSTMENT,
+    PROP_HSCROLL_POLICY,
+    PROP_VSCROLL_POLICY
 };
 
 typedef enum
@@ -79,6 +85,9 @@ struct _RsttoImageViewerPriv
     gboolean                     limit_quality;
 
     GError                      *error;
+
+    guint                        hscroll_policy : 1;
+    guint                        vscroll_policy : 1;
 
     RsttoImageViewerTransaction *transaction;
     GdkPixbuf                   *pixbuf;
@@ -166,11 +175,11 @@ paint_background_icon (
 
 
 static void
-rstto_image_viewer_init (GObject *);
+rstto_image_viewer_init (RsttoImageViewer *viewer);
 static void
 rstto_image_viewer_class_init(RsttoImageViewerClass *);
 static void
-rstto_image_viewer_destroy(GtkWidget *widget);
+rstto_image_viewer_dispose (GObject *object);
 
 static void
 rstto_image_viewer_get_preferred_width(GtkWidget *, gint *, gint *);
@@ -279,37 +288,12 @@ rstto_image_viewer_transaction_free (RsttoImageViewerTransaction *tr);
 static GtkWidgetClass *parent_class = NULL;
 static GdkScreen      *default_screen = NULL;
 
-GType
-rstto_image_viewer_get_type (void)
-{
-    static GType rstto_image_viewer_type = 0;
-
-    if (!rstto_image_viewer_type)
-    {
-        static const GTypeInfo rstto_image_viewer_info = 
-        {
-            sizeof (RsttoImageViewerClass),
-            (GBaseInitFunc) NULL,
-            (GBaseFinalizeFunc) NULL,
-            (GClassInitFunc) rstto_image_viewer_class_init,
-            (GClassFinalizeFunc) NULL,
-            NULL,
-            sizeof (RsttoImageViewer),
-            0,
-            (GInstanceInitFunc) rstto_image_viewer_init,
-            NULL
-        };
-
-        rstto_image_viewer_type = g_type_register_static (GTK_TYPE_WIDGET, "RsttoImageViewer", &rstto_image_viewer_info, 0);
-    }
-    return rstto_image_viewer_type;
-}
+G_DEFINE_TYPE_WITH_CODE (RsttoImageViewer, rstto_image_viewer, GTK_TYPE_WIDGET,
+             G_IMPLEMENT_INTERFACE (GTK_TYPE_SCROLLABLE, NULL))
 
 static void
-rstto_image_viewer_init ( GObject *object )
+rstto_image_viewer_init (RsttoImageViewer *viewer)
 {
-    RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER (object);
-
     if (default_screen == NULL)
     {
         default_screen = gdk_screen_get_default();
@@ -373,7 +357,8 @@ rstto_image_viewer_init ( GObject *object )
                            GDK_BUTTON_RELEASE_MASK |
                            GDK_BUTTON1_MOTION_MASK |
                            GDK_ENTER_NOTIFY_MASK |
-                           GDK_POINTER_MOTION_MASK);
+                           GDK_POINTER_MOTION_MASK |
+                           GDK_SCROLL_MASK);
 
 
     gtk_drag_dest_set(GTK_WIDGET(viewer), GTK_DEST_DEFAULT_ALL, NULL, 0,
@@ -395,13 +380,10 @@ rstto_image_viewer_class_init(RsttoImageViewerClass *viewer_class)
     GtkWidgetClass *widget_class;
     GObjectClass   *gobject_class;
 
-
     gobject_class = G_OBJECT_CLASS (viewer_class);
     widget_class = GTK_WIDGET_CLASS (viewer_class);
 
     parent_class = g_type_class_peek_parent(viewer_class);
-
-    viewer_class->set_scroll_adjustments = rstto_image_viewer_set_scroll_adjustments;
 
     widget_class->draw = rstto_image_viewer_draw;
     widget_class->realize = rstto_image_viewer_realize;
@@ -415,22 +397,10 @@ rstto_image_viewer_class_init(RsttoImageViewerClass *viewer_class)
     widget_class->motion_notify_event = rstto_motion_notify_event;
     widget_class->popup_menu = rstto_popup_menu;
 
-    widget_class->destroy = rstto_image_viewer_destroy;
-
     gobject_class->set_property = rstto_image_viewer_set_property;
     gobject_class->get_property = rstto_image_viewer_get_property;
+    gobject_class->dispose = rstto_image_viewer_dispose;
 
-
-    widget_class->set_scroll_adjustments_signal =
-                  g_signal_new ("set_scroll_adjustments",
-                                G_TYPE_FROM_CLASS (object_class),
-                                G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
-                                G_STRUCT_OFFSET (RsttoImageViewerClass, set_scroll_adjustments),
-                                NULL, NULL,
-                                _rstto_marshal_VOID__OBJECT_OBJECT,
-                                G_TYPE_NONE, 2,
-                                GTK_TYPE_ADJUSTMENT,
-                                GTK_TYPE_ADJUSTMENT);
     g_signal_new (
             "size-ready",
             G_TYPE_FROM_CLASS (gobject_class),
@@ -472,6 +442,24 @@ rstto_image_viewer_class_init(RsttoImageViewerClass *viewer_class)
             G_OBJECT_CLASS(gobject_class),
             PROP_SHOW_CLOCK,
             pspec);
+
+    /* Scrollable interface properties */
+    g_object_class_override_property (
+            gobject_class,
+            PROP_HADJUSTMENT,
+            "hadjustment");
+    g_object_class_override_property (
+            gobject_class,
+            PROP_VADJUSTMENT,
+            "vadjustment");
+    g_object_class_override_property (
+            gobject_class,
+            PROP_HSCROLL_POLICY,
+            "hscroll-policy");
+    g_object_class_override_property (
+            gobject_class,
+            PROP_VSCROLL_POLICY,
+            "vscroll-policy");
 }
 
 /**
@@ -521,6 +509,8 @@ rstto_image_viewer_realize(GtkWidget *widget)
 
     gdk_window_set_user_data (window, widget);
 
+    g_object_ref (window);
+
     g_object_get_property (
             G_OBJECT(viewer->priv->settings),
             "bgcolor",
@@ -565,13 +555,15 @@ rstto_image_viewer_realize(GtkWidget *widget)
 static void
 rstto_image_viewer_get_preferred_width(GtkWidget *widget, gint *minimal_width, gint *natural_width)
 {
-    *minimal_width = *natural_width = 400;
+    *minimal_width = 100;
+    *natural_width = 400;
 }
 
 static void
 rstto_image_viewer_get_preferred_height(GtkWidget *widget, gint *minimal_height, gint *natural_height)
 {
-    *minimal_height = *natural_height = 300;
+    *minimal_height = 100;
+    *natural_height = 300;
 }
 
 /**
@@ -584,12 +576,13 @@ static void
 rstto_image_viewer_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
 {
     RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER (widget);
+    GdkWindow *window = gtk_widget_get_window (widget);
     gint border_width = 0;
 
     gtk_widget_set_allocation (widget, allocation);
     if (gtk_widget_get_realized (widget))
     {
-        gdk_window_move_resize (gtk_widget_get_window (widget),
+        gdk_window_move_resize (window,
                 allocation->x + border_width,
                 allocation->y + border_width,
                 allocation->width - border_width * 2,
@@ -603,35 +596,19 @@ rstto_image_viewer_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
             set_scale (viewer, 0.0);
         }
 
-        gdk_window_invalidate_rect (
-                gtk_widget_get_window (widget),
-                NULL,
-                FALSE);
+        gdk_window_invalidate_rect (window, NULL, FALSE);
     }
 }
 
 /**
- * rstto_image_viewer_expose:
+ * rstto_image_viewer_draw:
  * @widget:
- * @event:
+ * @cairo_t:
  *
  */
 static gboolean
 rstto_image_viewer_draw(GtkWidget *widget, cairo_t *ctx)
 {
-    RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER (widget);
-
-    /* set a clip region for the expose event */
-    if (FALSE == viewer->priv->auto_scale)
-    {
-        cairo_rectangle (
-                ctx,
-                0, 0,
-                gtk_widget_get_allocated_width (widget),
-                gtk_widget_get_allocated_height (widget));
-        cairo_clip (ctx);
-    }
-
     cairo_save (ctx);
 
     rstto_image_viewer_paint (widget, ctx);
@@ -642,9 +619,9 @@ rstto_image_viewer_draw(GtkWidget *widget, cairo_t *ctx)
 }
 
 static void
-rstto_image_viewer_destroy(GtkWidget *widget)
+rstto_image_viewer_dispose(GObject *object)
 {
-    RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER(widget);
+    RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER(object);
 
     if (viewer->priv)
     {
@@ -874,12 +851,15 @@ paint_background (GtkWidget *widget, cairo_t *ctx)
 {
     RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER (widget);
     GdkColor *bg_color = NULL;
+    GdkWindow *window = gtk_widget_get_window (widget);
+    GtkAllocation allocation;
+    GtkStyleContext *context = gtk_widget_get_style_context (widget);
 
     /* Determine if we draw the 'default' background-color,
      * or the fullscreen-background-color.
      */
     if (GDK_WINDOW_STATE_FULLSCREEN & gdk_window_get_state (
-                gdk_window_get_toplevel (gtk_widget_get_window (widget))))
+                gdk_window_get_toplevel (window)))
     {
         bg_color = viewer->priv->bg_color_fs;
     }
@@ -891,8 +871,16 @@ paint_background (GtkWidget *widget, cairo_t *ctx)
 
     /* Paint the background-color */
     /******************************/
-    gdk_cairo_set_source_color (ctx, bg_color);
-    cairo_paint (ctx);
+    if ( NULL != bg_color )
+    {
+        gdk_cairo_set_source_color ( ctx, bg_color );
+        cairo_paint (ctx);
+    }
+    else
+    {
+        gtk_widget_get_allocation (widget, &allocation);
+        gtk_render_background (context, ctx, 0, 0, allocation.width, allocation.height);
+    }
 }
 
 static void
@@ -2857,7 +2845,7 @@ cb_rstto_bgcolor_changed (GObject *settings, GParamSpec *pspec, gpointer user_da
     }
     else
     {
-        viewer->priv->bg_color = &(gtk_widget_get_style (widget)->bg[GTK_STATE_NORMAL]);
+        viewer->priv->bg_color = NULL;
     }
     viewer->priv->bg_color_fs = g_value_get_boxed (&val_bg_color_fs);
 
@@ -2933,6 +2921,48 @@ rstto_image_viewer_set_property (GObject *object, guint property_id, const GValu
         case PROP_SHOW_CLOCK:
             viewer->priv->props.show_clock = g_value_get_boolean (value);
             break;
+        case PROP_HADJUSTMENT:
+            if(viewer->hadjustment)
+            {
+                g_signal_handlers_disconnect_by_func(viewer->hadjustment, viewer->priv->cb_value_changed, viewer);
+                g_object_unref(viewer->hadjustment);
+            }
+            viewer->hadjustment = g_value_get_object (value);
+
+            if(viewer->hadjustment)
+            {
+                gtk_adjustment_set_lower (viewer->hadjustment, 0);
+                gtk_adjustment_set_upper (viewer->hadjustment, 0);
+
+                g_signal_connect(G_OBJECT(viewer->hadjustment), "value-changed", (GCallback)viewer->priv->cb_value_changed, viewer);
+                g_object_ref(viewer->hadjustment);
+            }
+            break;
+        case PROP_VADJUSTMENT:
+            if(viewer->vadjustment)
+            {
+                g_signal_handlers_disconnect_by_func(viewer->vadjustment, viewer->priv->cb_value_changed, viewer);
+                g_object_unref(viewer->vadjustment);
+            }
+            viewer->vadjustment = g_value_get_object (value);
+
+            if(viewer->vadjustment)
+            {
+                gtk_adjustment_set_lower (viewer->vadjustment, 0);
+                gtk_adjustment_set_upper (viewer->vadjustment, 0);
+
+                g_signal_connect(G_OBJECT(viewer->vadjustment), "value-changed", (GCallback)viewer->priv->cb_value_changed, viewer);
+                g_object_ref(viewer->vadjustment);
+            }
+            break;
+        case PROP_HSCROLL_POLICY:
+            viewer->priv->hscroll_policy = g_value_get_enum (value);
+            gtk_widget_queue_resize (GTK_WIDGET (viewer));
+            break;
+        case PROP_VSCROLL_POLICY:
+            viewer->priv->vscroll_policy = g_value_get_enum (value);
+            gtk_widget_queue_resize (GTK_WIDGET (viewer));
+            break;
     }
 }
 
@@ -2945,6 +2975,18 @@ rstto_image_viewer_get_property (GObject *object, guint property_id, GValue *val
     {
         case PROP_SHOW_CLOCK:
             g_value_set_boolean (value, viewer->priv->props.show_clock);
+            break;
+        case PROP_HADJUSTMENT:
+            g_value_set_object (value, viewer->hadjustment);
+            break;
+        case PROP_VADJUSTMENT:
+            g_value_set_object (value, viewer->vadjustment);
+            break;
+        case PROP_HSCROLL_POLICY:
+            g_value_set_enum (value, viewer->priv->hscroll_policy);
+            break;
+        case PROP_VSCROLL_POLICY:
+            g_value_set_enum (value, viewer->priv->vscroll_policy);
             break;
     }
 }
