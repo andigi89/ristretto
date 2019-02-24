@@ -1564,19 +1564,17 @@ static void
 rstto_image_viewer_paint (GtkWidget *widget, cairo_t *ctx)
 {
     RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER (widget);
-    GtkAllocation allocation;
     
     if (gtk_widget_get_realized (widget))
     {
-        gtk_widget_get_allocation (widget, &allocation);
         correct_adjustments (viewer);
 
         cairo_rectangle (
                 ctx,
                 0.0,
                 0.0,
-                (gdouble)allocation.width,
-                (gdouble)allocation.height);
+                (gdouble)gtk_widget_get_allocated_width (widget),
+                (gdouble)gtk_widget_get_allocated_height (widget));
         cairo_clip (ctx);
         cairo_save (ctx);
         
