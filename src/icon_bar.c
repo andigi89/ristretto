@@ -105,14 +105,26 @@ rstto_icon_bar_size_request (
         GtkRequisition *requisition);
 
 static void
+rstto_icon_bar_get_preferred_width (
+        GtkWidget *widget,
+        gint *minimal_width,
+        gint *natural_width);
+
+static void
+rstto_icon_bar_get_preferred_height (
+        GtkWidget *widget,
+        gint *minimal_height,
+        gint *natural_height);
+
+static void
 rstto_icon_bar_size_allocate (
         GtkWidget     *widget,
         GtkAllocation *allocation);
 
 static gboolean
-rstto_icon_bar_expose (
+rstto_icon_bar_draw (
         GtkWidget      *widget,
-        GdkEventExpose *expose);
+        cairo_t        *cr);
 
 static gboolean
 rstto_icon_bar_leave (
@@ -168,7 +180,7 @@ static void
 rstto_icon_bar_paint_item (
         RsttoIconBar     *icon_bar,
         RsttoIconBarItem *item,
-        GdkRectangle     *area);
+        cairo_t          *cr);
 
 static void
 rstto_icon_bar_calculate_item_size (
@@ -311,9 +323,10 @@ rstto_icon_bar_class_init (RsttoIconBarClass *klass)
     gtkwidget_class->style_set = rstto_icon_bar_style_set;
     gtkwidget_class->realize = rstto_icon_bar_realize;
     gtkwidget_class->unrealize = rstto_icon_bar_unrealize;
-    gtkwidget_class->size_request = rstto_icon_bar_size_request;
+    gtkwidget_class->get_preferred_width = rstto_icon_bar_get_preferred_width;
+    gtkwidget_class->get_preferred_height = rstto_icon_bar_get_preferred_height;
     gtkwidget_class->size_allocate = rstto_icon_bar_size_allocate;
-    gtkwidget_class->expose_event = rstto_icon_bar_expose;
+    gtkwidget_class->draw = rstto_icon_bar_draw;
     gtkwidget_class->leave_notify_event = rstto_icon_bar_leave;
     gtkwidget_class->motion_notify_event = rstto_icon_bar_motion;
     gtkwidget_class->scroll_event = rstto_icon_bar_scroll;
@@ -760,6 +773,23 @@ rstto_icon_bar_size_request (
     }
 }
 
+static void
+rstto_icon_bar_get_preferred_width (GtkWidget *widget, gint *minimal_width, gint *natural_width)
+{
+    GtkRequisition requisition;
+
+    rstto_icon_bar_size_request (widget, &requisition);
+    *minimal_width = *natural_width = requisition.width;
+}
+
+static void
+rstto_icon_bar_get_preferred_height (GtkWidget *widget, gint *minimal_height, gint *natural_height)
+{
+    GtkRequisition requisition;
+
+    rstto_icon_bar_size_request (widget, &requisition);
+    *minimal_height = *natural_height = requisition.height;
+}
 
 
 static void
@@ -879,9 +909,9 @@ rstto_icon_bar_size_allocate (
 
 
 static gboolean
-rstto_icon_bar_expose (
+rstto_icon_bar_draw (
         GtkWidget      *widget,
-        GdkEventExpose *expose)
+        cairo_t *cr)
 {
     RsttoIconBarItem *item;
     GdkRectangle    area;
@@ -890,8 +920,9 @@ rstto_icon_bar_expose (
     RsttoFile      *file;
     GtkTreeIter     iter;
 
-    if (expose->window != icon_bar->priv->bin_window)
-        return FALSE;
+    /* FIXME: is it still needed? */
+    /*if (expose->window != icon_bar->priv->bin_window)
+         return FALSE;*/
 
     for (lp = icon_bar->priv->items; lp != NULL; lp = lp->next)
     {
@@ -911,11 +942,12 @@ rstto_icon_bar_expose (
         area.width = icon_bar->priv->item_width;
         area.height = icon_bar->priv->item_height;
 
-
-        if (gdk_region_rect_in (expose->region, &area) != GDK_OVERLAP_RECTANGLE_OUT)
+        /* FIXME */
+        /*if (gdk_region_rect_in (expose->region, &area) != GDK_OVERLAP_RECTANGLE_OUT)
         {
-            rstto_icon_bar_paint_item (icon_bar, item, &expose->area);
-        }
+            rstto_icon_bar_paint_item (icon_bar, item, &expose->area);*/
+            rstto_icon_bar_paint_item (icon_bar, item, cr);
+        /*}
         else
         {
             iter = item->iter;
@@ -924,7 +956,7 @@ rstto_icon_bar_expose (
                     -1);
             rstto_thumbnailer_dequeue_file (icon_bar->priv->thumbnailer, file);
             g_object_unref (file);
-        }
+        }*/
     }
 
     return TRUE;
@@ -1217,12 +1249,11 @@ static void
 rstto_icon_bar_paint_item (
         RsttoIconBar     *icon_bar,
         RsttoIconBarItem *item,
-        GdkRectangle     *area)
+        cairo_t          *cr)
 {
     const GdkPixbuf *pixbuf = NULL;
     GdkColor        *border_color;
     GdkColor        *fill_color;
-    cairo_t         *cr;
     gint             focus_width;
     gint             focus_pad;
     gint             x, y;
@@ -1296,8 +1327,7 @@ rstto_icon_bar_paint_item (
             gdk_color_parse ("#316ac5", border_color);
         }
 
-        cr = gdk_cairo_create (icon_bar->priv->bin_window);
-        gdk_cairo_rectangle (cr, area);
+        cairo_save (cr);
         cairo_clip (cr);
         cairo_set_source_rgb (cr, fill_color->red/65535., fill_color->green/65535., fill_color->blue/65535.);
         cairo_rectangle (cr, x + focus_pad + focus_width, y + focus_pad + focus_width,
@@ -1312,7 +1342,7 @@ rstto_icon_bar_paint_item (
                          icon_bar->priv->item_width - (2 * focus_pad + focus_width),
                          icon_bar->priv->item_height - (2 * focus_pad + focus_width));
         cairo_stroke (cr);
-        cairo_destroy (cr);
+        cairo_restore (cr);
 
         gdk_color_free (border_color);
         gdk_color_free (fill_color);
@@ -1336,8 +1366,7 @@ rstto_icon_bar_paint_item (
             gdk_color_parse ("#98b4e2", border_color);
         }
 
-        cr = gdk_cairo_create (icon_bar->priv->bin_window);
-        gdk_cairo_rectangle (cr, area);
+        cairo_save (cr);
         cairo_clip (cr);
         cairo_set_source_rgb (cr, fill_color->red/65535., fill_color->green/65535., fill_color->blue/65535.);
         cairo_rectangle (cr, x + focus_pad + focus_width, y + focus_pad + focus_width,
@@ -1352,7 +1381,7 @@ rstto_icon_bar_paint_item (
                          icon_bar->priv->item_width - (2 * focus_pad + focus_width),
                          icon_bar->priv->item_height - (2 * focus_pad + focus_width));
         cairo_stroke (cr);
-        cairo_destroy (cr);
+        cairo_restore (cr);
 
         gdk_color_free (border_color);
         gdk_color_free (fill_color);
@@ -1361,10 +1390,10 @@ rstto_icon_bar_paint_item (
 
     if (NULL != pixbuf)
     {
-        cr = gdk_cairo_create (icon_bar->priv->bin_window);
+        cairo_save (cr);
         gdk_cairo_set_source_pixbuf (cr, pixbuf, px, py);
         cairo_paint (cr);
-        cairo_destroy (cr);
+        cairo_restore (cr);
     }
 }
 
