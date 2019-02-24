@@ -2098,8 +2098,7 @@ cb_rstto_main_window_navigationtoolbar_button_press_event (GtkWidget *widget, Gd
 
     if (event->button == 3 && event->type == GDK_BUTTON_PRESS)
     {
-        gtk_menu_popup (GTK_MENU (window->priv->position_menu), NULL, NULL, NULL, NULL,
-                event->button, event->time);
+        gtk_menu_popup_at_pointer (GTK_MENU (window->priv->position_menu), NULL);
     }
 
     return FALSE;
