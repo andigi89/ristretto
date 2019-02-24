@@ -69,7 +69,6 @@ struct _RsttoImageViewerPriv
     RsttoFile                   *file;
     RsttoSettings               *settings;
     GdkVisual                   *visual;
-    GdkColormap                 *colormap;
 
     GtkIconTheme                *icon_theme;
     GdkPixbuf                   *missing_icon;
@@ -320,7 +319,6 @@ rstto_image_viewer_init ( GObject *object )
     viewer->priv->image_width = 0;
     viewer->priv->image_height = 0;
     viewer->priv->visual = gdk_visual_get_system ();
-    viewer->priv->colormap = gdk_colormap_new (viewer->priv->visual, TRUE);
 
     viewer->priv->icon_theme = gtk_icon_theme_get_default ();
     viewer->priv->bg_icon = gtk_icon_theme_load_icon (
@@ -514,9 +512,8 @@ rstto_image_viewer_realize(GtkWidget *widget)
     attributes.window_type = GDK_WINDOW_CHILD;
     attributes.event_mask = gtk_widget_get_events (widget) | GDK_EXPOSURE_MASK | GDK_BUTTON_PRESS_MASK;
     attributes.visual = gtk_widget_get_visual (widget);
-    attributes.colormap = gtk_widget_get_colormap (widget);
 
-    attributes_mask = GDK_WA_X | GDK_WA_Y | GDK_WA_VISUAL | GDK_WA_COLORMAP;
+    attributes_mask = GDK_WA_X | GDK_WA_Y | GDK_WA_VISUAL;
     window = gdk_window_new (gtk_widget_get_parent_window(widget), &attributes, attributes_mask);
     gtk_widget_set_window (widget, window);
 
