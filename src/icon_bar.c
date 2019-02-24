@@ -458,25 +458,6 @@ rstto_icon_bar_class_init (RsttoIconBarClass *klass)
                 G_PARAM_READABLE));
 
     /**
-     * RsttoIconBar::set-scroll-adjustments:
-     * @icon_bar    : The #RsttoIconBar.
-     * @hadjustment : The horizontal adjustment.
-     * @vadjustment : The vertical adjustment.
-     *
-     * Used internally to make the #RsttoIconBar scrollable.
-     **/
-    gtkwidget_class->set_scroll_adjustments_signal =
-        g_signal_new ("set-scroll-adjustments",
-                G_TYPE_FROM_CLASS (gobject_class),
-                G_SIGNAL_RUN_LAST,
-                G_STRUCT_OFFSET (RsttoIconBarClass, set_scroll_adjustments),
-                NULL, NULL,
-                _rstto_marshal_VOID__OBJECT_OBJECT,
-                G_TYPE_NONE, 2,
-                GTK_TYPE_ADJUSTMENT,
-                GTK_TYPE_ADJUSTMENT);
-
-    /**
      * RsttoIconBar::selection-changed:
      * @icon_bar  : The #RsttoIconBar.
      *
