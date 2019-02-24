@@ -171,7 +171,7 @@ rstto_image_viewer_init (GObject *);
 static void
 rstto_image_viewer_class_init(RsttoImageViewerClass *);
 static void
-rstto_image_viewer_destroy(GtkObject *object);
+rstto_image_viewer_destroy(GtkWidget *widget);
 
 static void
 rstto_image_viewer_size_request(GtkWidget *, GtkRequisition *);
@@ -393,10 +393,11 @@ rstto_image_viewer_class_init(RsttoImageViewerClass *viewer_class)
 {
     GParamSpec *pspec;
     GtkWidgetClass *widget_class;
-    GtkObjectClass *object_class;
+    GObjectClass   *gobject_class;
 
-    widget_class = (GtkWidgetClass*)viewer_class;
-    object_class = (GtkObjectClass*)viewer_class;
+
+    gobject_class = G_OBJECT_CLASS (viewer_class);
+    widget_class = GTK_WIDGET_CLASS (viewer_class);
 
     parent_class = g_type_class_peek_parent(viewer_class);
 
@@ -413,10 +414,10 @@ rstto_image_viewer_class_init(RsttoImageViewerClass *viewer_class)
     widget_class->motion_notify_event = rstto_motion_notify_event;
     widget_class->popup_menu = rstto_popup_menu;
 
-    object_class->destroy = rstto_image_viewer_destroy;
+    widget_class->destroy = rstto_image_viewer_destroy;
 
-    G_OBJECT_CLASS(object_class)->set_property = rstto_image_viewer_set_property;
-    G_OBJECT_CLASS(object_class)->get_property = rstto_image_viewer_get_property;
+    gobject_class->set_property = rstto_image_viewer_set_property;
+    gobject_class->get_property = rstto_image_viewer_get_property;
 
 
     widget_class->set_scroll_adjustments_signal =
@@ -431,28 +432,28 @@ rstto_image_viewer_class_init(RsttoImageViewerClass *viewer_class)
                                 GTK_TYPE_ADJUSTMENT);
     g_signal_new (
             "size-ready",
-            G_TYPE_FROM_CLASS (object_class),
+            G_TYPE_FROM_CLASS (gobject_class),
             G_SIGNAL_RUN_FIRST,
             0,
             NULL, NULL,
             g_cclosure_marshal_VOID__VOID,
             G_TYPE_NONE, 0);
     g_signal_new ("scale-changed",
-            G_TYPE_FROM_CLASS (object_class),
+            G_TYPE_FROM_CLASS (gobject_class),
             G_SIGNAL_RUN_FIRST,
             0,
             NULL, NULL,
             g_cclosure_marshal_VOID__VOID,
             G_TYPE_NONE, 0);
     g_signal_new ("status-changed",
-            G_TYPE_FROM_CLASS (object_class),
+            G_TYPE_FROM_CLASS (gobject_class),
             G_SIGNAL_RUN_FIRST,
             0,
             NULL, NULL,
             g_cclosure_marshal_VOID__VOID,
             G_TYPE_NONE, 0);
     g_signal_new ("files-dnd",
-            G_TYPE_FROM_CLASS (object_class),
+            G_TYPE_FROM_CLASS (gobject_class),
             G_SIGNAL_RUN_FIRST,
             0,
             NULL, NULL,
@@ -467,7 +468,7 @@ rstto_image_viewer_class_init(RsttoImageViewerClass *viewer_class)
             FALSE,
             G_PARAM_READWRITE);
     g_object_class_install_property (
-            G_OBJECT_CLASS(object_class),
+            G_OBJECT_CLASS(gobject_class),
             PROP_SHOW_CLOCK,
             pspec);
 }
@@ -651,9 +652,9 @@ rstto_image_viewer_expose(GtkWidget *widget, GdkEventExpose *event)
 }
 
 static void
-rstto_image_viewer_destroy(GtkObject *object)
+rstto_image_viewer_destroy(GtkWidget *widget)
 {
-    RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER(object);
+    RsttoImageViewer *viewer = RSTTO_IMAGE_VIEWER(widget);
 
     if (viewer->priv)
     {

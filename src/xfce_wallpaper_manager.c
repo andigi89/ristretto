@@ -127,8 +127,8 @@ struct _RsttoXfceWallpaperManagerPriv
     GtkWidget *monitor_chooser;
     GtkWidget *style_combo;
     GtkWidget *check_button;
-    GtkObject *saturation_adjustment;
-    GtkObject *brightness_adjustment;
+    GtkWidget *saturation_adjustment;
+    GtkWidget *brightness_adjustment;
 
     GtkWidget *dialog;
 };
