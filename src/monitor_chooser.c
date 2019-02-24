@@ -62,7 +62,9 @@ rstto_monitor_chooser_finalize(GObject *object);
 static void
 rstto_monitor_chooser_realize(GtkWidget *widget);
 static void
-rstto_monitor_chooser_size_request(GtkWidget *, GtkRequisition *);
+rstto_monitor_chooser_get_preferred_width(GtkWidget *, gint *, gint *);
+static void
+rstto_monitor_chooser_get_preferred_height(GtkWidget *, gint *, gint *);
 static void
 rstto_monitor_chooser_size_allocate(GtkWidget *, GtkAllocation *);
 static gboolean 
@@ -148,7 +150,8 @@ rstto_monitor_chooser_class_init(RsttoMonitorChooserClass *chooser_class)
 
     widget_class->expose_event = rstto_monitor_chooser_expose;
     widget_class->realize = rstto_monitor_chooser_realize;
-    widget_class->size_request = rstto_monitor_chooser_size_request;
+    widget_class->get_preferred_width = rstto_monitor_chooser_get_preferred_width;
+    widget_class->get_preferred_height = rstto_monitor_chooser_get_preferred_height;
     widget_class->size_allocate = rstto_monitor_chooser_size_allocate;
 
     object_class->finalize = rstto_monitor_chooser_finalize;
@@ -208,10 +211,15 @@ rstto_monitor_chooser_realize(GtkWidget *widget)
 
 
 static void
-rstto_monitor_chooser_size_request(GtkWidget *widget, GtkRequisition *requisition)
+rstto_monitor_chooser_get_preferred_width(GtkWidget *widget, gint *minimal_width, gint *natural_width)
 {
-    requisition->height = 200;
-    requisition->width = 400;
+    *minimal_width = *natural_width = 400;
+}
+
+static void
+rstto_monitor_chooser_get_preferred_height(GtkWidget *widget, gint *minimal_height, gint *natural_height)
+{
+    *minimal_height = *natural_height = 200;
 }
 
 static void
